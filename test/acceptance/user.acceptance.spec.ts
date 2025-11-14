@@ -4,28 +4,27 @@ import { User } from "../../src/modules/user/user.entity";
 import { UserRepository } from "../../src/modules/user/user.repository";
 import { InMemoryUserRepository } from './in-memory-user.repository';
 
-// --- ¡AQUÍ ESTÁN LOS TESTS ASÍNCRONOS! ---
+
 describe('Iteración 1 - Gestión de usuarios (HU01-HU04)', () => {
   let service: UserService;
-  let repo: InMemoryUserRepository; // Instancia del Fake para limpiar y verificar
+  let repo: InMemoryUserRepository;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        UserService, // 1. El SUT (Servicio real, pero stub)
+        UserService, 
         {
-          provide: UserRepository,    // 2. El "Token" de la dependencia
-          useClass: InMemoryUserRepository, // 3. ¡La magia! Sustituimos por el Fake
+          provide: UserRepository,
+          useClass: InMemoryUserRepository,
         },
       ],
     }).compile();
 
-    // Nest inyecta automáticamente el InMemoryUserRepository en el UserService
     service = module.get<UserService>(UserService);
     repo = module.get<UserRepository>(UserRepository) as InMemoryUserRepository;
   });
 
-  // ¡Importante! Limpiamos la BBDD en memoria después de CADA test
+
   afterEach(async () => {
     await repo.clear();
   });
@@ -55,7 +54,6 @@ describe('Iteración 1 - Gestión de usuarios (HU01-HU04)', () => {
     const newUser = new User('002', 'Nuevo', 'User', 'dupe@mail.com', 'hash2');
 
     // THEN (Esperamos que el servicio lance el error)
-    // (Esta prueba fallará con "Not implemented" en lugar de "EmailAlreadyRegisteredError")
     await expect(service.register(newUser)).rejects.toThrow(
       'EmailAlreadyRegisteredError',
     );
