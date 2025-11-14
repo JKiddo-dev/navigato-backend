@@ -1,15 +1,13 @@
-import { User } from '../user/user.entity';
+// Fichero: src/modules/user/user.repository.ts
 
-export class UserRepository {
-  save(user: User): void {
-    throw new Error('Not implemented');
-  }
+import { User } from './user.entity';
 
-  findByEmail(email: string): User | null {
-    throw new Error('Not implemented');
-  }
+// Usamos una clase abstracta como "Token" de Inyección de Dependencias (DI).
+// ¡Todos los métodos devuelven Promise porque son asíncronos!
+export abstract class UserRepository {
+  abstract save(user: User): Promise<void>;
 
-  delete(email: string): void {
-    throw new Error('Not implemented');
-  }
+  abstract findByEmail(email: string): Promise<User | null>;
+
+  abstract delete(email: string): Promise<void>;
 }
