@@ -2,6 +2,7 @@ import { Favorite } from './favorites.entity';
 import { FavoriteRepository } from './favorites.repository';
 
 export class FavoriteService {
+
   constructor(private repo: FavoriteRepository) {}
 
   markFavorite(fav: Favorite): boolean {

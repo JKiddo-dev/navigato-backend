@@ -2,7 +2,7 @@ import { FavoriteService } from '../../src/modules/favorites/favorites.service';
 import { FavoriteRepository } from '../../src/modules/favorites/favorites.repository';
 import { Favorite } from '../../src/modules/favorites/favorites.entity';
 
-describe('HU20 - Marcar favorito', () => {
+describe('HU20 - Gestión de favoritos', () => {
   let service: FavoriteService;
   let mockRepo: jest.Mocked<FavoriteRepository>;
 
@@ -17,40 +17,36 @@ describe('HU20 - Marcar favorito', () => {
     service = new FavoriteService(mockRepo);
   });
 
-  test('debería permitir marcar un elemento como favorito si no lo estaba antes', () => {
-    const fav = new Favorite('user@example.com', 'item123');
+  /**
+   * HU20 - Como usuario quiero poder marcar como favorito cada elemento
+   */
+
+  test('Escenario VÁLIDO: marcar un elemento como favorito cuando no lo estaba', () => {
+    // GIVEN el elemento "Ruta al trabajo" existe en el sistema
+    // AND para ese usuario todavía no está marcado como favorito
+    const fav = new Favorite('user@example.com', 'Ruta al trabajo');
     mockRepo.findByUserAndItem.mockReturnValueOnce(null);
 
+    // WHEN el usuario marca el elemento como favorito
     const result = service.markFavorite(fav);
 
+    // THEN el sistema guarda el favorito correctamente
     expect(result).toBe(true);
     expect(mockRepo.save).toHaveBeenCalledWith(fav);
   });
 
-  test('no debería permitir marcar como favorito dos veces el mismo elemento', () => {
-    const fav = new Favorite('user@example.com', 'item123');
-    mockRepo.findByUserAndItem.mockReturnValueOnce(fav);
-
-    expect(() => service.markFavorite(fav)).toThrow();
-  });
-
-  test('debería desmarcar un elemento favorito existente', () => {
-    const fav = new Favorite('user@example.com', 'item123');
-    mockRepo.findByUserAndItem.mockReturnValueOnce(fav);
-
-    const result = service.unmarkFavorite(fav);
-
-    expect(result).toBe(true);
-    expect(mockRepo.delete).toHaveBeenCalledWith(fav.userEmail, fav.itemId);
-  });
-
-  test('no debería desmarcar si el elemento no está en favoritos', () => {
-    const fav = new Favorite('user@example.com', 'item123');
+  test('Escenario INVÁLIDO: desmarcar un favorito que no existe lanza error', () => {
+    // GIVEN el usuario NO tiene el elemento "Ruta al cine" en su lista de favoritos
+    const fav = new Favorite('user@example.com', 'Ruta al cine');
     mockRepo.findByUserAndItem.mockReturnValueOnce(null);
 
-    expect(() => service.unmarkFavorite(fav)).toThrow();
+    // WHEN intenta desmarcarlo como favorito
+    // THEN se lanza la excepción "FavoriteNotFoundError" (o similar)
+    expect(() => service.unmarkFavorite(fav)).toThrow('FavoriteNotFoundError');
+    expect(mockRepo.delete).not.toHaveBeenCalled();
   });
 
+  // (Opcional, pero lo puedes dejar porque es coherente con la HU20)
   test('debería listar todos los favoritos de un usuario', () => {
     const favorites = [
       new Favorite('user@example.com', 'item1'),

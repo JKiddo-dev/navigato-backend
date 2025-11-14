@@ -2,6 +2,7 @@ import { UserRepository } from './user.repository';
 import { User } from './user.entity';
 
 export class UserService {
+
   constructor(private repo: UserRepository) {}
 
   register(user: User): boolean {
@@ -12,7 +13,7 @@ export class UserService {
     throw new Error('Not implemented');
   }
 
-  logout(): void {
+  logout(): boolean {
     throw new Error('Not implemented');
   }
 
