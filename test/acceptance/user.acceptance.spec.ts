@@ -1,182 +1,132 @@
-import { UserService } from '../../src/modules/user/user.service';
-import { UserRepository } from '../../src/modules/user/user.repository';
-import { User } from '../../src/modules/user/user.entity';
+import { Test, TestingModule } from '@nestjs/testing';
+import { UserService } from "../../src/modules/user/user.service";
+import { User } from "../../src/modules/user/user.entity";
+import { UserRepository } from "../../src/modules/user/user.repository";
+import { InMemoryUserRepository } from './in-memory-user.repository';
 
-describe('Gestión de usuarios (HU01-HU04)', () => {
+// --- ¡AQUÍ ESTÁN LOS TESTS ASÍNCRONOS! ---
+describe('Iteración 1 - Gestión de usuarios (HU01-HU04)', () => {
   let service: UserService;
-  let mockRepo: jest.Mocked<UserRepository>;
+  let repo: InMemoryUserRepository; // Instancia del Fake para limpiar y verificar
 
-  beforeEach(() => {
-    mockRepo = {
-      save: jest.fn(),
-      findByEmail: jest.fn(),
-      delete: jest.fn(),
-    } as unknown as jest.Mocked<UserRepository>;
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        UserService, // 1. El SUT (Servicio real, pero stub)
+        {
+          provide: UserRepository,    // 2. El "Token" de la dependencia
+          useClass: InMemoryUserRepository, // 3. ¡La magia! Sustituimos por el Fake
+        },
+      ],
+    }).compile();
 
-    service = new UserService(mockRepo);
+    // Nest inyecta automáticamente el InMemoryUserRepository en el UserService
+    service = module.get<UserService>(UserService);
+    repo = module.get<UserRepository>(UserRepository) as InMemoryUserRepository;
   });
 
-  /**
-   * HU01 - Como usuario no registrado quiero poder registrarme
-   */
-
-  describe('HU01 - Registro de usuario', () => {
-    test('Escenario VÁLIDO: registra un nuevo usuario cuando el email no existe', () => {
-      // GIVEN lista de usuarios registrados en el sistema es []
-      mockRepo.findByEmail.mockReturnValueOnce(null);
-      const newUser: User = {
-        email: 'pruebasistema@gmail.com',
-        password: 'Prueba-34',
-        nombre: 'Prueba',
-        apellidos: 'García Fernández',
-      } as unknown as User;
-
-      const result = service.register(newUser);
-
-      // THEN el sistema registra al usuario y lo guarda en el repositorio
-      expect(result).toBe(true);
-      expect(mockRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          email: 'pruebasistema@gmail.com',
-          password: 'Prueba-34',
-          nombre: 'Prueba',
-          apellidos: 'García Fernández',
-        }),
-      );
-    });
-
-    test('Escenario INVÁLIDO: no permite registro si el email ya está registrado', () => {
-      // GIVEN ya existe un usuario con ese correo
-      const existingUser: User = {
-        email: 'pruebasistema@gmail.com',
-        password: 'Prueba-34',
-      } as unknown as User;
-
-      mockRepo.findByEmail.mockReturnValueOnce(existingUser);
-
-      const newUser: User = {
-        email: 'pruebasistema@gmail.com',
-        password: 'Prueba-34',
-      } as unknown as User;
-
-      // WHEN intenta registrarse de nuevo
-      // THEN se lanza la excepción "EmailAlreadyRegisteredError"
-      expect(() => service.register(newUser)).toThrow('EmailAlreadyRegisteredError');
-      expect(mockRepo.save).not.toHaveBeenCalled();
-    });
+  // ¡Importante! Limpiamos la BBDD en memoria después de CADA test
+  afterEach(async () => {
+    await repo.clear();
   });
 
-  /**
-   * HU02 - Como usuario registrado quiero iniciar sesión
-   */
-  describe('HU02 - Inicio de sesión', () => {
-    test('Escenario VÁLIDO: permite inicio de sesión con credenciales correctas', () => {
-      // GIVEN usuario registrado con contraseña válida
-      const existingUser: User = {
-        email: 'usuario.registrado@ejemplo.com',
-        password: 'ClaveValida-123',
-      } as unknown as User;
+  // =============================================
+  // HU01 - Registro
+  // =============================================
 
-      mockRepo.findByEmail.mockReturnValueOnce(existingUser);
+  it('HU01_E01 - Registro válido (DEBE FALLAR)', async () => {
+    // GIVEN (El repo está vacío gracias al afterEach)
+    const user = new User('001', 'Prueba', 'García', 'test@mail.com', 'hash(pass)');
 
-      // WHEN introduce el correo y la contraseña correctos
-      const result = service.login('usuario.registrado@ejemplo.com', 'ClaveValida-123');
+    // WHEN (Esta línea lanzará el error "Not implemented")
+    const result = await service.register(user);
 
-      // THEN el inicio de sesión tiene éxito
-      expect(result).toBe(true);
-    });
-
-    test('Escenario INVÁLIDO: contraseña incorrecta lanza InvalidCredentialsError', () => {
-      // GIVEN usuario registrado pero introduce contraseña incorrecta
-      const existingUser: User = {
-        email: 'usuario.registrado@ejemplo.com',
-        password: 'ClaveValida-123',
-      } as unknown as User;
-
-      mockRepo.findByEmail.mockReturnValueOnce(existingUser);
-
-      // WHEN la contraseña es incorrecta
-      // THEN se lanza "InvalidCredentialsError"
-      expect(() =>
-        service.login('usuario.registrado@ejemplo.com', 'ClaveIncorrecta-999'),
-      ).toThrow('InvalidCredentialsError');
-    });
+    // THEN (El test nunca llegará aquí, por eso fallará)
+    expect(result).toBeDefined();
+    expect(result.correo).toBe('test@mail.com');
   });
 
-  /**
-   * HU03 - Como usuario quiero poder cerrar la sesión
-   */
-  describe('HU03 - Cierre de sesión', () => {
-    test('Escenario VÁLIDO: un usuario con sesión iniciada cierra su sesión', () => {
-      // GIVEN existe un usuario registrado y sin sesión activa aún
-      const existingUser: User = {
-        email: 'usuario.activo@ejemplo.com',
-        password: 'securePass',
-      } as unknown as User;
+  it('HU01_E02 - Email ya registrado (DEBE FALLAR)', async () => {
+    // GIVEN (Un usuario ya existe en el Fake)
+    const existing = new User('001', 'Test', 'User', 'dupe@mail.com', 'hash');
+    await repo.save(existing); // Lo guardamos de verdad en el Fake
 
-      mockRepo.findByEmail.mockReturnValueOnce(existingUser);
+    // WHEN (El servicio intentará registrarlo)
+    const newUser = new User('002', 'Nuevo', 'User', 'dupe@mail.com', 'hash2');
 
-      // AND el usuario inicia sesión correctamente
-      service.login('usuario.activo@ejemplo.com', 'securePass');
-
-      // WHEN solicita cerrar sesión
-      const result = service.logout();
-
-      // THEN el cierre de sesión se realiza correctamente
-      expect(result).toBe(true);
-    });
-
-    test('Escenario INVÁLIDO: visitante anónimo intenta cerrar sesión', () => {
-      // GIVEN no hay ninguna sesión activa
-
-      // WHEN se llama a logout sin haber hecho login
-      // THEN se lanza "NoUserAuthenticatedError"
-      expect(() => service.logout()).toThrow('NoUserAuthenticatedError');
-    });
+    // THEN (Esperamos que el servicio lance el error)
+    // (Esta prueba fallará con "Not implemented" en lugar de "EmailAlreadyRegisteredError")
+    await expect(service.register(newUser)).rejects.toThrow(
+      'EmailAlreadyRegisteredError',
+    );
   });
 
-  /**
-   * HU04 - Como usuario quiero poder eliminar mi cuenta
-   */
-  describe('HU04 - Eliminación de cuenta', () => {
-    test('Escenario VÁLIDO: usuario autenticado elimina su cuenta', () => {
-      const email = 'usuario.a.eliminar@ejemplo.com';
+  // =============================================
+  // HU02 - Login
+  // =============================================
 
-      // GIVEN existe un usuario registrado y una sesión activa
-      const existingUser: User = {
-        email,
-        password: 'Prueba-34',
-      } as unknown as User;
+  it('HU02_E01 - Login válido (DEBE FALLAR)', async () => {
+    // GIVEN
+    const user = new User('001', 'Pedro', 'García', 'pedro@mail.com', 'hash(Valida)');
+    await repo.save(user);
 
-      // Primera llamada: login, segunda llamada: deleteAccount (si lo necesitas)
-      mockRepo.findByEmail.mockReturnValue(existingUser);
+    // WHEN (Esta línea lanzará "Not implemented")
+    const logged = await service.login('pedro@mail.com', 'Valida');
 
-      // el usuario inicia sesión
-      service.login(email, 'Prueba-34');
+    // THEN (Nunca llegará aquí)
+    expect(logged.sesion_activa).toBe(true);
+  });
 
-      // WHEN solicita eliminar su cuenta
-      const result = service.deleteAccount(email);
+  it('HU02_E02 - Contraseña incorrecta (DEBE FALLAR)', async () => {
+    // GIVEN
+    const user = new User('001', 'Pedro', 'García', 'pedro@mail.com', 'hash(Valida)');
+    await repo.save(user);
 
-      // THEN se elimina la cuenta y se borra del repositorio
-      expect(result).toBe(true);
-      expect(mockRepo.delete).toHaveBeenCalledWith(email);
-    });
+    // WHEN/THEN (Fallará con "Not implemented")
+    await expect(
+      service.login('pedro@mail.com', 'Incorrecta'),
+    ).rejects.toThrow('InvalidCredentialsError');
+  });
 
-    test('Escenario INVÁLIDO: usuario no autenticado intenta eliminar su cuenta', () => {
-      const email = 'usuario.a.eliminar@ejemplo.com';
+  // =============================================
+  // HU03 - Logout
+  // =============================================
 
-      const existingUser: User = {
-        email,
-        password: 'Prueba-34',
-      } as unknown as User;
+  it('HU03_E01 - Logout válido (DEBE FALLAR)', async () => {
+    // WHEN (Fallará con "Not implemented")
+    await service.logout();
+    // THEN (No hay 'then', solo esperamos que no lance error)
+  });
 
-      // El usuario existe en la BD pero NO hay sesión activa
-      mockRepo.findByEmail.mockReturnValue(existingUser);
+  it('HU03_E02 - No hay sesión activa (DEBE FALLAR)', async () => {
+    // WHEN/THEN (Fallará con "Not implemented")
+    await expect(service.logout()).rejects.toThrow('NoUserAuthenticatedError');
+  });
 
-      // WHEN intenta eliminar la cuenta sin estar autenticado
-      // THEN se lanza "AuthenticationRequiredError" y NO se borra nada
-      expect(() => service.deleteAccount(email)).toThrow('AuthenticationRequiredError');
-      expect(mockRepo.delete).not.toHaveBeenCalled();
-    });
+  // =============================================
+  // HU04 - Eliminar cuenta
+  // =============================================
+
+  it('HU04_E01 - Eliminación válida (DEBE FALLAR)', async () => {
+    // GIVEN
+    const user = new User('004', 'Activo', 'User', 'del@mail.com', 'hash', true);
+    await repo.save(user);
+
+    // WHEN (Fallará con "Not implemented")
+    const result = await service.deleteAccount('del@mail.com');
+
+    // THEN (Nunca llegará aquí)
+    expect(result).toBe(true);
+  });
+
+  it('HU04_E02 - No autenticado (DEBE FALLAR)', async () => {
+    // GIVEN
+    const user = new User('004', 'Inactivo', 'User', 'del@mail.com', 'hash', false);
+    await repo.save(user);
+
+    // WHEN/THEN (Fallará con "Not implemented")
+    await expect(
+      service.deleteAccount('del@mail.com'),
+    ).rejects.toThrow('AuthenticationRequiredError');
   });
 });
